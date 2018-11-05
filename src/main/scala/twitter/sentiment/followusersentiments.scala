@@ -1,3 +1,4 @@
+
 package twitter.sentiment
 
 
@@ -21,7 +22,8 @@ object followusersentiments {
       System.exit(1)
     }
      val appName = "Nasdaq sentiments"
-    val spark: SparkSession = SparkSession.builder.master("local[2]").getOrCreate
+    val spark: SparkSession = SparkSession.builder.master("local[2]").config("spark.sql.warehouse.dir", "/tmp").getOrCreate
+    
     import org.apache.spark.sql.types._
     import spark.implicits._ 
     val ssc = new StreamingContext(spark.sparkContext, Seconds(5))
@@ -36,7 +38,7 @@ object followusersentiments {
     StructField("industry", StringType, true)
 
   ))
-    val staticdf = spark.read.option("header", "true").schema(schema).csv("C:/data/companylist.csv").drop("LastSale","IPOyear")
+    val staticdf = spark.read.option("header", "true").schema(schema).csv("/home/bkjdev/dev/companylist.csv").drop("LastSale","IPOyear")
     
     staticdf.show(false)
     val sc = ssc.sparkContext
@@ -56,8 +58,8 @@ object followusersentiments {
     //tweets .saveAsTextFiles("tweets", "json")
     //val stream = TwitterUtils.createStream(ssc, None)
    //filter by user id
-    val hashTags = stream.filter(_.getLang()=="en").filter(_.getUser().getId==25073877).flatMap(status => status.getText.split(" ").filter(_.startsWith("#")))
-    val hashTags2 = stream.filter(_.getLang()=="en").filter({
+   // val hashTags = stream.filter(_.getLang()=="en").filter(_.getUser().getId==25073877).flatMap(status => status.getText.split(" ").filter(_.startsWith("#")))
+    val hashTags2 = stream.filter(_.getLang()=="en").filter(_.getUser().getId==25073877).filter({
       {t => 
        val tags = t.getText.split(" ").filter(_.startsWith("#")).map(_.toLowerCase)
        !tags.isEmpty 
@@ -67,11 +69,6 @@ object followusersentiments {
     val topCounts60 = hashTags2.map((_, 1)).reduceByKeyAndWindow(_ + _, Seconds(60))
                      .map{case (topic, count) => (count, topic)}
                      .transform(_.sortByKey(false))
-
-    val topCounts10 = hashTags2.map((_, 1)).reduceByKeyAndWindow(_ + _, Seconds(10))
-                     .map{case (topic, count) => (count, topic)}
-                     .transform(_.sortByKey(false))
-    
     val sqlContex = spark.sqlContext
    
     val data1 = topCounts60.map { status =>

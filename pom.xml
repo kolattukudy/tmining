@@ -26,6 +26,18 @@
   </properties>
 
   <dependencies>
+  <dependency>
+    <groupId>org.antlr</groupId>
+    <artifactId>antlr4</artifactId>
+    <version>4.5</version>
+    <!-- If you only need the JAR in test, add the following line too -->
+</dependency>
+<!-- https://mvnrepository.com/artifact/org.antlr/antlr4-runtime -->
+<dependency>
+    <groupId>org.antlr</groupId>
+    <artifactId>antlr4-runtime</artifactId>
+    <version>4.5.3</version>
+</dependency>
     <dependency>
       <groupId>org.scala-lang</groupId>
       <artifactId>scala-library</artifactId>
