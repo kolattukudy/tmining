@@ -57,20 +57,21 @@ object followusersentiments {
     val stream = TwitterUtils.createStream(ssc, Some(auth), filters)
     //tweets .saveAsTextFiles("tweets", "json")
     //val stream = TwitterUtils.createStream(ssc, None)
-   //filter by user id
+ 
    // val hashTags = stream.filter(_.getLang()=="en").filter(_.getUser().getId==25073877).flatMap(status => status.getText.split(" ").filter(_.startsWith("#")))
+    //filter by user id
     val hashTags2 = stream.filter(_.getLang()=="en").filter(_.getUser().getId==25073877).filter({
       {t => 
        val tags = t.getText.split(" ").filter(_.startsWith("#")).map(_.toLowerCase)
        !tags.isEmpty 
     }
     })
-
+   //get the top hashtag by 60 seconds
     val topCounts60 = hashTags2.map((_, 1)).reduceByKeyAndWindow(_ + _, Seconds(60))
                      .map{case (topic, count) => (count, topic)}
                      .transform(_.sortByKey(false))
     val sqlContex = spark.sqlContext
-   
+   //create  tuple with tag, text and sentiment 
     val data1 = topCounts60.map { status =>
     val sentiment = SentimentAnalysisUtils.detectSentiment(status._2.getText)
     val tags = status._2.getHashtagEntities.map(_.getText.toLowerCase)
@@ -78,11 +79,20 @@ object followusersentiments {
     (tags,status._2.getText, sentiment.toString)
     }
     data1.cache().foreachRDD(rdd => {
+      //create rdd with tuple
       val df = spark.createDataFrame(rdd)
+      //explode the hastags
       val newdf=df.withColumn("hashtags",explode(col("_1")))
+      //create list from the company dataframe
       val list=staticdf.select("Symbol").map(r => r.getString(0)).collect.toList 
+      //check if the user is mentioning about the symbol or company 
+      //by filtering the incoming streaming rdd with the list of user company tags
       val filterdf=newdf.filter($"hashtags".isin(list:_*)).withColumnRenamed("_3", "sentiment").withColumnRenamed("_2", "text").withColumnRenamed("_1", "tagsarray")
-
+      
+      //now store the content in hdfs
+       if(!filterdf.rdd.isEmpty()){
+        filterdf.write.mode("append").parquet("/data/bjose") 
+       }
       filterdf.createOrReplaceTempView("sentiments")
       filterdf.show(false)
       //sqlContex.sql("select * from sentiments limit 20").show(false)
