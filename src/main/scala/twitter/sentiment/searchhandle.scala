@@ -45,25 +45,26 @@ object searchhandle {
     for (line <- bufferedSource.getLines) {
         val cols = line.split(",").map(_.trim)
         // do whatever you want with the columns here
-        println(s"${cols(0)}|${cols(1)}|${cols(2)}|${cols(3)}")
-        listcompany+=cols(0)
+       // println(s"${cols(0)}|${cols(1)}|${cols(2)}|${cols(3)}")
+        listcompany+=cols(1)
         
     }
     
     bufferedSource.close
-    print(listcompany.mkString(","))
+   // print(listcompany.mkString(","))
+    val handlelist=new ListBuffer[String]()
+    for (company <- listcompany){
+      print(company)
     val query = new Query("Harley Davidson")
     val searchString ="Harley Davidson"
-    val result =twitter.searchUsers(searchString,1)
-    import scala.collection.JavaConversions._
-    
+    val results =twitter.searchUsers(company,1)
+    handlelist+=results.head.getScreenName
+    }   
     //val listTweet =result.getTweets()
-    for (status <-result) {
-      println(status.getScreenName +"--"+ status.getName +"--"+ status.getDescription)
+    for (status <-handlelist) {
+      println(status)
+      //println(status.getScreenName +"--"+ status.getName +"--"+ status.getDescription)
+    }         
     }
-    
-     
-    }
-   }
-   
+   }   
 }
