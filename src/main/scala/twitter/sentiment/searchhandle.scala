@@ -54,7 +54,7 @@ object searchhandle {
     }
     
     bufferedSource.close*/
-    
+    def sleep(time: Long) { Thread.sleep(time) }
     val reader = CSVReader.open(new File("/home/bkjdev/dev/companylist.csv"))
     val headerdata= reader.allWithHeaders()
     val listcompany =headerdata.map(x=>x.get("Name"))
@@ -62,18 +62,24 @@ object searchhandle {
     print(flatcompany)
    // print(listcompany.mkString(","))
     val handlelist=new ListBuffer[String]()
-    for (company <- flatcompany){
-      if(Character.isDigit(company.charAt(0))){
+   val copanyset=flatcompany.toSet.grouped(14).toList.iterator
+    while (copanyset.hasNext ){
+      val company=copanyset.next
+       while(company.iterator.hasNext){
+        val companyVal=company.iterator.next
+      
+      if(Character.isDigit(companyVal.charAt(0))){
          println(company)
        }else{
-        val results =twitter.searchUsers(company,1)
+        val results =twitter.searchUsers(companyVal,1)
         if(results.size()>0)
        handlelist+=results.head.getScreenName
+       sleep(900000)
         //
        }
-
+       }
       } 
-  //   val result s =twitter.searchUsers(company,1)
+  //  val result s =twitter.searchUsers(company,1)
   //  handlelist+=results.head.getScreenName
   //  }   
     //val listTweet =result.getTweets()
