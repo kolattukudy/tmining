@@ -14,7 +14,7 @@ import twitter.sentiment.utils._
 import twitter4j.FilterQuery
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
-object followusersentiments {
+object extracthandle {
   def main(args: Array[String]) {
     if (args.length < 4) {
       System.err.println("Usage: TwitterData <ConsumerKey><ConsumerSecret><accessToken><accessTokenSecret>" +
@@ -60,7 +60,7 @@ object followusersentiments {
  
    // val hashTags = stream.filter(_.getLang()=="en").filter(_.getUser().getId==25073877).flatMap(status => status.getText.split(" ").filter(_.startsWith("#")))
     //filter by user id
-    val hashTags2 = stream.filter(_.getLang()=="en").filter(_.getUser().getId==25073877).filter({
+    val hashTags2 = stream.filter(_.getLang()=="en").filter({
       {t => 
        val tags = t.getText.split(" ").filter(_.startsWith("#")).map(_.toLowerCase)
        !tags.isEmpty 
@@ -85,6 +85,7 @@ object followusersentiments {
       val df = spark.createDataFrame(rdd)
       //explode the hastags
       val newdf=df.withColumn("mentions",explode(col("_4")))
+      newdf.show(false)
       //create list from the company dataframe
       val list=staticdf.select("Symbol").map(r => r.getString(0)).collect.toList 
       //check if the user is mentioning about the symbol or company 
