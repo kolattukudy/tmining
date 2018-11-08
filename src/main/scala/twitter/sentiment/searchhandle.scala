@@ -38,7 +38,20 @@ object searchhandle {
     // val auth = new OAuthAuthorization(cb.build)
     val twitter = new TwitterFactory(cb.build()).getInstance();
     val cursor = -1.longValue()
+    import scala.io.Source
+    import scala.collection.mutable.ListBuffer
+    var listcompany=new ListBuffer[String]()
+    val bufferedSource = Source.fromFile("/home/bkjdev/dev/companylist.csv")
+    for (line <- bufferedSource.getLines) {
+        val cols = line.split(",").map(_.trim)
+        // do whatever you want with the columns here
+        println(s"${cols(0)}|${cols(1)}|${cols(2)}|${cols(3)}")
+        listcompany+=cols(0)
+        
+    }
     
+    bufferedSource.close
+    print(listcompany.mkString(","))
     val query = new Query("Harley Davidson")
     val searchString ="Harley Davidson"
     val result =twitter.searchUsers(searchString,1)
