@@ -69,7 +69,7 @@ object searchhandle {
         val results =twitter.searchUsers(company,1)
         if(results.size()>0)
        handlelist+=results.head.getScreenName
-        
+        //
        }
 
       } 
