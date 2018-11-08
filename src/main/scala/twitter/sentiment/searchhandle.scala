@@ -10,13 +10,16 @@ import org.apache.spark.streaming.twitter._
 import twitter.sentiment.utils._
 import twitter4j.FilterQuery
 import twitter4j.TwitterFactory
-
+ import scala.collection.mutable.ListBuffer
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
 import org.apache.log4j.{LogManager, Level}
 import org.apache.commons.logging.LogFactory
 import twitter4j._
+import scala.collection.JavaConversions._
+import com.github.tototoshi.csv._
 
+import java.io.File
 object searchhandle {
    def main(args: Array[String]) {
     if (args.length < 4) {
@@ -40,30 +43,44 @@ object searchhandle {
     val cursor = -1.longValue()
     import scala.io.Source
     import scala.collection.mutable.ListBuffer
-    var listcompany=new ListBuffer[String]()
-    val bufferedSource = Source.fromFile("/home/bkjdev/dev/companylist.csv")
+    //var listcompany=new ListBuffer[String]()
+    /*val bufferedSource = Source.fromFile("/home/bkjdev/dev/companylist.csv")
     for (line <- bufferedSource.getLines) {
         val cols = line.split(",").map(_.trim)
         // do whatever you want with the columns here
         println(s"${cols(0)}|${cols(1)}|${cols(2)}|${cols(3)}")
-        listcompany+=cols(0)
+        listcompany+=cols(1)
         
     }
     
-    bufferedSource.close
-    print(listcompany.mkString(","))
-    val query = new Query("Harley Davidson")
-    val searchString ="Harley Davidson"
-    val result =twitter.searchUsers(searchString,1)
-    import scala.collection.JavaConversions._
+    bufferedSource.close*/
     
+    val reader = CSVReader.open(new File("/home/bkjdev/dev/companylist.csv"))
+    val headerdata= reader.allWithHeaders()
+    val listcompany =headerdata.map(x=>x.get("Name"))
+    val flatcompany= listcompany.flatMap(flat=> flat) 
+    print(flatcompany)
+   // print(listcompany.mkString(","))
+    val handlelist=new ListBuffer[String]()
+    for (company <- flatcompany){
+      if(Character.isDigit(company.charAt(0))){
+         println(company)
+       }else{
+        val results =twitter.searchUsers(company,1)
+        if(results.size()>0)
+       handlelist+=results.head.getScreenName
+        
+       }
+
+      } 
+  //   val result s =twitter.searchUsers(company,1)
+  //  handlelist+=results.head.getScreenName
+  //  }   
     //val listTweet =result.getTweets()
-    for (status <-result) {
-      println(status.getScreenName +"--"+ status.getName +"--"+ status.getDescription)
+    for (status <-handlelist) {
+      println(status)
+      //println(status.getScreenName +"--"+ status.getName +"--"+ status.getDescription)
+    }         
     }
-    
-     
-    }
-   }
-   
+} 
 }
