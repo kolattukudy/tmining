@@ -13,79 +13,82 @@ import twitter4j.TwitterFactory
 import scala.collection.mutable.ListBuffer
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
-import org.apache.log4j.{LogManager, Level}
+import org.apache.log4j.{ LogManager, Level }
 import org.apache.commons.logging.LogFactory
 import twitter4j._
 import scala.collection.JavaConversions._
 import com.github.tototoshi.csv._
-import scala.concurrent.{future, blocking, Future, Await}
+import scala.concurrent.{ future, blocking, Future, Await }
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{Failure, Success}
+import scala.util.{ Failure, Success }
 import java.io.File
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration._
 
 object searchhandle {
-   def main(args: Array[String]) {
+  def main(args: Array[String]) {
     if (args.length < 4) {
       System.err.println("Usage: TwitterData <ConsumerKey><ConsumerSecret><accessToken><accessTokenSecret>" +
         "[<filters>]")
       System.exit(1)
-    }else{
-    LogManager.getRootLogger().setLevel(Level.ERROR)
-    val Array(consumerKey, consumerSecret, accessToken, accessTokenSecret) = args.take(4)
-    val filters = args.takeRight(args.length - 4)
-    val cb = new ConfigurationBuilder
-    cb.setDebugEnabled(true).setOAuthConsumerKey(consumerKey)
-      .setOAuthConsumerSecret(consumerSecret)
-      .setOAuthAccessToken(accessToken)
-      .setOAuthAccessTokenSecret(accessTokenSecret)
-       .setUserStreamRepliesAllEnabled(true)
-   //https://developer.twitter.com/en/docs/accounts-and-users/follow-search-get-users/api-reference/get-users-lookup.html
+    } else {
+      LogManager.getRootLogger().setLevel(Level.ERROR)
+      val Array(consumerKey, consumerSecret, accessToken, accessTokenSecret) = args.take(4)
+      val filters = args.takeRight(args.length - 4)
+      val cb = new ConfigurationBuilder
+      cb.setDebugEnabled(true).setOAuthConsumerKey(consumerKey)
+        .setOAuthConsumerSecret(consumerSecret)
+        .setOAuthAccessToken(accessToken)
+        .setOAuthAccessTokenSecret(accessTokenSecret)
+        .setUserStreamRepliesAllEnabled(true)
+      //https://developer.twitter.com/en/docs/accounts-and-users/follow-search-get-users/api-reference/get-users-lookup.html
       val twitter = new TwitterFactory(cb.build()).getInstance();
-    val cursor = -1.longValue()
-    import scala.io.Source
-    import scala.collection.mutable.ListBuffer
-   val file = "whatever.txt"
-   import java.io._
+      val cursor = -1.longValue()
+      import scala.io.Source
+      import scala.collection.mutable.ListBuffer
+      val file_success = "companies.txt"
+      val file_failed = "failed.txt"
+      import java.io._
+      val writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file_success)))
+      val writerf = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file_failed)))
 
-  val writer = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file)))
-    def sleep(time: Long) { Thread.sleep(time) }
-    val reader = CSVReader.open(new File("/users/bjdev/companylist.csv"))
-    val headerdata= reader.allWithHeaders()
-    val listcompany =headerdata.map(x=>x.get("Name"))
-    val flatcompany= listcompany.flatMap(flat=> flat) 
-    print(flatcompany)
-   // print(listcompany.mkString(","))
-    val handlelist=new ListBuffer[String]()
-    val myFuts: List[Future[String]] = flatcompany.map {myid => 
-    val myfut = future { val results=twitter.searchUsers(myid,1)
-    handlelist+=results.head.getScreenName 
-    Thread.sleep(90000)
-    results.head.getScreenName 
-    }
-  val result = for (myval <- myfut) yield {
-    val res = s"SUCCESS $myid: $myval"
-    val sucessval=s"$myid,$myval"
-    println(res)
-    writer.write(sucessval)
-  
-    // for (status <-handlelist) {println(status)} 
-    res
-  }
-  result.recover{
-    case ex => 
-     val failureval=s"$myid,"
-     writer.write(failureval)
-     
-      println (s"failed with error:$myid : $ex")
-      "FAILED"          
-  }
+      def sleep(time: Long) { Thread.sleep(time) }
+      val reader = CSVReader.open(new File("/Users/bkjdev/Downloads/companylist.csv"))
+      val headerdata = reader.allWithHeaders()
+      val listcompany = headerdata.map(x => x.get("Name"))
+      val flatcompany = listcompany.flatMap(flat => flat)
+      print(flatcompany)
+      // print(listcompany.mkString(","))
+      val handlelist = new ListBuffer[String]()
+      val myFuts: List[Future[String]] = flatcompany.map { myid =>
+        val myfut = Future {
+          val results = twitter.searchUsers(myid, 1)
+          handlelist += results.head.getScreenName
+          Thread.sleep(90000)
+          results.head.getScreenName
+        }
+        val result = for (myval <- myfut) yield {
+          val res = s"SUCCESS $myid: $myval"
+          val sucessval = s"$myid,$myval"+"\n"
+          writerf.write(sucessval)
+          println(res)
 
-}
-  writer.close()
-val futset: Future[List[String]] = Future.sequence(myFuts)
-println (Await.result(futset, 1000 seconds))
+          // for (status <-handlelist) {println(status)}
+          res
+        }
+        result.recover {
+          case ex =>
+            val failureval = s"$myid,"+"\n"
+            writerf.write(failureval)
+            println(s"failed with error:$myid : $ex")
+            "FAILED"
+        }
+      }
+
+      val futset: Future[List[String]] = Future.sequence(myFuts)
+      Await.result(futset, Duration.Inf)
+      writer.close()
+
     }
-   }
+  }
 }
