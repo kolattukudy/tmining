@@ -28,19 +28,15 @@ object followusersentiments {
     import spark.implicits._ 
     val ssc = new StreamingContext(spark.sparkContext, Seconds(5))
     val schema = StructType(Array(
-    StructField("Symbol", StringType, true),
-    StructField("Name", StringType, true),
-    StructField("LastSale", StringType, true),
-    StructField("MarketCap", StringType, true),
-    StructField("IPOyear", StringType, true),
-    StructField("Sector", StringType, true),
-
-    StructField("industry", StringType, true)
-
-  ))
-    val staticdf = spark.read.option("header", "true").schema(schema).csv("/home/bkjdev/dev/companylist.csv").drop("LastSale","IPOyear")
+    StructField("name", StringType, true),
+    StructField("handle", StringType, true))
     
-    staticdf.show(false)
+
+  )
+    val staticdf = spark.read.option("header", "true").schema(schema).csv("companylist.txt")
+    staticdf.select(staticdf("handle")).distinct.show(60,false)
+    //staticdf.show(false)
+    
     val sc = ssc.sparkContext
     import org.apache.log4j.{LogManager, Level}
     import org.apache.commons.logging.LogFactory
@@ -54,17 +50,21 @@ object followusersentiments {
       .setOAuthAccessTokenSecret(accessTokenSecret)
       
     val auth = new OAuthAuthorization(cb.build)
-    val stream = TwitterUtils.createStream(ssc, Some(auth), filters)
+     val query =  new FilterQuery().follow(149024206)
+    val stream = TwitterUtils.createFilteredStream(ssc, Some(auth), Some(query))
     //tweets .saveAsTextFiles("tweets", "json")
     //val stream = TwitterUtils.createStream(ssc, None)
  
    // val hashTags = stream.filter(_.getLang()=="en").filter(_.getUser().getId==25073877).flatMap(status => status.getText.split(" ").filter(_.startsWith("#")))
+   //trump user id  25073877
+    //icehanger user id 149024206
     //filter by user id
-    val hashTags2 = stream.filter(_.getLang()=="en").filter(_.getUser().getId==25073877).filter({
+   
+    val hashTags2= stream.filter(_.getLang()=="en").filter(
+    //val hashTags2 = stream.filter(_.getLang()=="en").filter(_.getUser().getId==149024206).filter({
       {t => 
-       val tags = t.getText.split(" ").filter(_.startsWith("#")).map(_.toLowerCase)
+       val tags = t.getText.split(" ").filter(_.startsWith("@")).map(_.toLowerCase)
        !tags.isEmpty 
-    }
     })
    //get the top hashtag by 60 seconds
     val topCounts60 = hashTags2.map((_, 1)).reduceByKeyAndWindow(_ + _, Seconds(60))
@@ -80,17 +80,19 @@ object followusersentiments {
     
     (tags,status._2.getText, sentiment.toString,mentionString)
     }
+   
     data1.cache().foreachRDD(rdd => {
       //create rdd with tuple
       val df = spark.createDataFrame(rdd)
       //explode the hastags
       val newdf=df.withColumn("mentions",explode(col("_4")))
+      newdf.show(false)
       //create list from the company dataframe
-      val list=staticdf.select("Symbol").map(r => r.getString(0)).collect.toList 
+      val list=staticdf.select("handle").map(r => r.getString(0)).collect.toList 
       //check if the user is mentioning about the symbol or company 
       //by filtering the incoming streaming rdd with the list of user company tags
       val filterdf=newdf.filter($"mentions".isin(list:_*)).withColumnRenamed("_3", "sentiment").withColumnRenamed("_2", "text").withColumnRenamed("_1", "tagsarray")
-      
+       
       //now store the content in hdfs
        if(!filterdf.rdd.isEmpty()){
         filterdf.write.mode("append").parquet("/data/bjose") 
