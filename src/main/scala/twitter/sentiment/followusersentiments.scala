@@ -33,9 +33,21 @@ object followusersentiments {
     
 
   )
-    val staticdf = spark.read.option("header", "true").schema(schema).csv("companylist.txt")
-    staticdf.select(staticdf("handle")).distinct.show(60,false)
-    //staticdf.show(false)
+  def stripString:(String =>String)={inputString=>
+  val suffixes = List(", Inc"," Inc.",", L.P."," Corp."," Limited", ", Inc.","Plc", "Ltd.",", L.P",".COM","S.A","N.A","A/S","ETF",",")
+  val strippedString = suffixes.foldLeft(inputString) { (string, suffix ) => 
+    string.stripSuffix(suffix)
+}
+  strippedString
+     }
+   
+    val strip_func=udf(stripString)
+    
+     val staticdf = spark.read.option("header", "true").option("delimiter",":").schema(schema).csv("companylist.txt")
+    val stripeddf=staticdf.select(staticdf("handle"),strip_func(col("name"))as "name")
+    
+
+    stripeddf.show(false)
     
     val sc = ssc.sparkContext
     import org.apache.log4j.{LogManager, Level}
@@ -57,7 +69,6 @@ object followusersentiments {
  
    // val hashTags = stream.filter(_.getLang()=="en").filter(_.getUser().getId==25073877).flatMap(status => status.getText.split(" ").filter(_.startsWith("#")))
    //trump user id  25073877
-    //icehanger user id 149024206
     //filter by user id
    
     val hashTags2= stream.filter(_.getLang()=="en").filter(
@@ -85,21 +96,36 @@ object followusersentiments {
       //create rdd with tuple
       val df = spark.createDataFrame(rdd)
       //explode the hastags
-      val newdf=df.withColumn("mentions",explode(col("_4")))
+      
+     val newdf=df.withColumnRenamed("_4", "mentions").withColumn("mentions",explode(col("mentions"))).withColumnRenamed("_2", "cname").withColumnRenamed("_3", "sentiment").withColumnRenamed("_1", "tagsarray")
       newdf.show(false)
+
       //create list from the company dataframe
-      val list=staticdf.select("handle").map(r => r.getString(0)).collect.toList 
+      //val list=staticdf.select("handle").map(r => r.getString(0)).collect.toList 
+      //create list from the company dataframe
+      val handlelist=stripeddf.select("handle").map(r => r.getString(0)).collect.toSet
+      val namelist=stripeddf.select("name").map(r => r.getString(0)).collect.toSet
+      print(handlelist)
       //check if the user is mentioning about the symbol or company 
       //by filtering the incoming streaming rdd with the list of user company tags
-      val filterdf=newdf.filter($"mentions".isin(list:_*)).withColumnRenamed("_3", "sentiment").withColumnRenamed("_2", "text").withColumnRenamed("_1", "tagsarray")
        
+      def udfh_check(words: scala.collection.immutable.Set[String]) = {
+      udf {(s: String) => words.exists(s.contains(_))}
+      }
+      def udf_check(words: scala.collection.immutable.Set[String]) = {
+      udf {(s: String) => words.exists(s.contains(_))}
+      }
+     val hdf=newdf.withColumn("handlecheck", udfh_check(handlelist)($"mentions"))
+     val mdf=hdf.withColumn("namecheck", udf_check(namelist)($"cname"))
+  
+      mdf.show(false)
+      val filterdf= mdf.withColumn("contentsplit", split(mdf("cname"), " ").cast("array<string>"))
+
       //now store the content in hdfs
        if(!filterdf.rdd.isEmpty()){
-        filterdf.write.mode("append").parquet("/data/bjose") 
+        filterdf.write.mode("append").parquet("/tmp/bjose") 
        }
-      filterdf.createOrReplaceTempView("sentiments")
       filterdf.show(false)
-      //sqlContex.sql("select * from sentiments limit 20").show(false)
      })       
     ssc.start()
     ssc.awaitTermination()
