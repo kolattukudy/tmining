@@ -109,13 +109,11 @@ object followusersentiments {
       //check if the user is mentioning about the symbol or company 
       //by filtering the incoming streaming rdd with the list of user company tags
        
-      def udfh_check(words: scala.collection.immutable.Set[String]) = {
-      udf {(s: String) => words.exists(s.contains(_))}
-      }
+      
       def udf_check(words: scala.collection.immutable.Set[String]) = {
       udf {(s: String) => words.exists(s.contains(_))}
       }
-     val hdf=newdf.withColumn("handlecheck", udfh_check(handlelist)($"mentions"))
+     val hdf=newdf.withColumn("handlecheck", udf_check(handlelist)($"mentions"))
      val mdf=hdf.withColumn("namecheck", udf_check(namelist)($"cname"))
   
       mdf.show(false)
